@@ -1,5 +1,4 @@
-s#include "dwgs.h"
-#include "types.h"
+#include "dwgs.h"
 #include <math.h>
 #include <stdio.h>
 

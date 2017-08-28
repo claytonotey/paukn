@@ -3,20 +3,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "types.h"
 
-#include "filter.h"
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include "types.h"
+#include "paukn.h"
+#include <algorithm>
 
 long choose(long n, long k) {
   long divisor = 1;
   long multiplier = n;
   long answer = 1;
-  k = min(k,n-k);
+  k = std::min(k,n-k);
   while(divisor <= k)
     {
       answer = (answer * multiplier) / divisor;
@@ -247,7 +242,6 @@ void clear_filter(Filter *c) {
   memset(c->y,0,(nmax+1)*sizeof(float));
 }
 
-#ifdef SSE
 #include <xmmintrin.h>
 float filter(float in, Filter *c) 
 {
@@ -300,42 +294,6 @@ float filter(float in, Filter *c)
 
   return out;
 }
-
-#else
-float filter(float in, Filter *c) 
-{
-  float *a = c->a;
-  float *b = c->b;
-  float *x = c->xc;
-  float *y = c->yc;
-  float *xend = c->xend;
-  float *yend = c->yend;
-  float out = *(b) * in;  
-  a++;
-  b++;
-  x++;
-  y++;
-
-  while(a <= aend) {
-    if(x>xend) x = c->x;
-    if(y>yend) y = c->y;
-    out += *(b) * *(x);
-    out -= *(a) * *(y);
-    b++;
-    a++;
-    x++;
-    y++;
-  }
-  x = c->xc;
-  y = c->yc;
-  *(x) = in;
-  *(y) = out;
-  x--; if(x<c->x) x = xend; c->xc = x;
-  y--; if(y<c->y) y = yend; c->yc = y;
-
-  return out;
-}
-#endif
 
 void init_delay(Delay *c, int di, float fb)
 {

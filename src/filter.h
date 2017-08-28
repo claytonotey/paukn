@@ -1,8 +1,6 @@
 #ifndef FILTER_H
 #define FILTER_H
 
-#include "types.h"
-
 struct Filter {
   float *x, *y;
   float *xc, *yc;

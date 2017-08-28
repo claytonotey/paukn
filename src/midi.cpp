@@ -5,6 +5,7 @@
 #include "midi.h"
 #include "vsteffect.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -22,6 +23,7 @@ void VstEffect :: reallyProcessEvents(VstEvents *events, BlockEvents *blockEvent
   bool sorted;
   BlockEvents tempEvent;
 
+
 /* note:  This function depends on the base plugin class to zero numBlockEvents 
 at the end of each processing block & does not do that itself because it is both 
 prossible & allowable for processEvents() to be called more than once per block. */
@@ -31,9 +33,11 @@ prossible & allowable for processEvents() to be called more than once per block.
     if ( ((events->events[i])->type) != kVstMidiType )
       continue;
 
+
     // cast the incoming event as a VstMidiEvent
     midiEvent = (VstMidiEvent*)events->events[i];
-    
+
+
     // address the midiData[4] string from the event to this temp data pointer
     midiData = midiEvent->midiData;
 
@@ -83,7 +87,7 @@ prossible & allowable for processEvents() to be called more than once per block.
       blockEvents[*numBlockEvents].delta = midiEvent->deltaFrames;	// timing offset
       
       (*numBlockEvents)++;
-	} else if ( (status == 0xb0) ) {
+	} else if (status == 0xb0) {
       blockEvents[*numBlockEvents].eventStatus = isControl;	// status
       blockEvents[*numBlockEvents].byte1 = midiData[1] & 0x7f;	// LSB
       blockEvents[*numBlockEvents].byte2 = midiData[2] & 0x7f;	// MSB

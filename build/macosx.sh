@@ -9,6 +9,6 @@ export VSTGUI_DIR="$VSTROOT/vstgui"
 export VST_CFLAGS="-I$VSTSDK_DIR -I$VSTPLUG_DIR -I$VSTGUI_DIR"
 export VST_LIBS="-framework Carbon -framework QuickTime -framework System -framework ApplicationServices"
 
-export CXXFLAGS="-arch i386"
-./configure --disable-universal_binary --enable-vst && make clean && make
+
+./configure --disable-universal_binary --enable-vst && make
 #./configure --enable-vst && make clean && make

@@ -2,9 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 
-
-double const d2i = (1.5 * (1 << 26) * (1 << 26));
 double voice :: freqTable[NUM_NOTES];
 double voice :: bendTable[PITCHBEND_MAX_RANGE+1][PITCHBEND_MAX];
 float sync_voice :: wave[1][WAVEFORM_SAMPLES];
@@ -180,10 +179,10 @@ delay_voice :: delay_voice(float fs, int note) : voice(fs,note)
 void voice :: reset() 
 {
   eps = 1e-5;
-  bAttackDone = FALSE;
-  bDecayDone = FALSE;
-  bSustainDone = FALSE;
-  bDone = FALSE;
+  bAttackDone = false;
+  bDecayDone = false;
+  bSustainDone = false;
+  bDone = false;
 }
 
 void thru_voice :: reset()
@@ -290,22 +289,22 @@ void voice :: tick()
 {
   if(!bAttackDone) {
     env += a;
-    if(env >= al) { env = al; bAttackDone = TRUE; }
+    if(env >= al) { env = al; bAttackDone = true; }
   } else if(!bDecayDone) {
     env -= d;
-    if(env <= sl) { env = sl; bDecayDone = TRUE; }
+    if(env <= sl) { env = sl; bDecayDone = true; }
   } else if(!bSustainDone) {
-    if(!bTriggered) { bSustainDone = TRUE; }
+    if(!bTriggered) { bSustainDone = true; }
   } else if(!bDone) {
     env -= r;
-    if(env < eps) { env = 0.0; bDone = TRUE; };   
+    if(env < eps) { env = 0.0; bDone = true; };   
   }
 
 }
 
 void voice :: triggerOn(float a, float al, float d, float sl)
 {
-  bTriggered = TRUE;
+  bTriggered = true;
   env = 0;
   this->a = a;
   this->al = al;
@@ -316,13 +315,13 @@ void voice :: triggerOn(float a, float al, float d, float sl)
 void voice :: triggerOff(float r)
 {
   this->r = r;
-  bTriggered = FALSE;
-  bAttackDone = TRUE;
-  bDecayDone = TRUE;
-  bSustainDone = TRUE;
+  bTriggered = false;
+  bAttackDone = true;
+  bDecayDone = true;
+  bSustainDone = true;
 }
 
-BOOL voice :: isDone()
+bool voice :: isDone()
 {
   return bDone;
 }
@@ -381,7 +380,7 @@ void sync_voice :: sync(float *in, float *out, sync_state *s, int sampleFrames)
 		if(s->i <= 0)
 			k = 0;
 		else
-			k = qint(s->i,res)%WAVEFORM_SAMPLES;
+			k = lrintf(s->i)%WAVEFORM_SAMPLES;
 		out[i] = wave[0][k];
 		s->i += di;
 		if(s->i >= WAVEFORM_SAMPLES) s->i -= WAVEFORM_SAMPLES;
@@ -500,18 +499,17 @@ void granulate_voice :: granulate(float *in, float *out, grain *g, int sampleFra
 	for(int i=0;i<sampleFrames;i++) {				
 		float envPoint = g->start+g->length;		
 		g->nextCrossover = theGranulator->crossover * length;		
-		if(g->cursor <= min(envPoint,g->start+length)) {
+		if(g->cursor <= std::min(envPoint,g->start+length)) {
 			g->crossover = g->nextCrossover;			
 			g->length = length;
 			envPoint = g->start+g->length;
 
 		}
 
-		double res;
-		int k = qint(g->cursor,res);
+		int k = lrintf(g->cursor);
 		int k2 = k + 1;
 		float cursor2 = (g->cursor - g->start + g->nextStart - g->length);
-		int l = qint(cursor2,res);		
+		int l = lrintf(cursor2);		
 		int l2 = l + 1;
 		if(k2 >= g->size)
 			k2 = k;
@@ -828,10 +826,10 @@ void Paukn :: process(float **inS, float **outS, VstInt32 sampleFrames)
 		  voice *v = voiceArray[event.byte1];
 		  if(v) {
 		    v->triggerOff(r);	
-			BOOL bAllNotTriggered = TRUE;
+			bool bAllNotTriggered = true;
 			voice *v = voiceList;
 			do {
-				if(v && v->bTriggered) { bAllNotTriggered = FALSE; break; }
+				if(v && v->bTriggered) { bAllNotTriggered = false; break; }
 			} while(v && (v=v->next) && v != voiceList);  
 			if(bAllNotTriggered) {		
 				gateOn();
@@ -879,7 +877,7 @@ void Paukn :: process(float **inS, float **outS, VstInt32 sampleFrames)
 				break;
 
 		}
-	}	
+    }	
     process(inS, outS, nextDelta - delta, delta);
 
 	delta = nextDelta;
@@ -893,7 +891,7 @@ Paukn :: Paukn (audioMasterCallback audioMaster, int parameters) : VstEffect(aud
 {
   setNumInputs (2);		// stereo in
   setNumOutputs (2);		// stereo out
-  setUniqueID ('Paun');	// identify
+  setUniqueID (44410724);	// identify
   //  isSynth(true);
   canProcessReplacing();
   
