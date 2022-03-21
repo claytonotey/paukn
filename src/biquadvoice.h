@@ -9,120 +9,111 @@ class BiquadVoice : public Voice<SampleType>
 {
  public:
   BiquadVoice(float fs, int note, int noteID, float velocity, float tuning, GlobalParams &params) :
-    Voice<SampleType>(fs, note, noteID, velocity, tuning, params)
+    Voice<SampleType>(fs, note, noteID, velocity, tuning, params),
+    biquadQ(params.biquadQ)
   {
-    stages = 1;
-    mode = filterTypeBandpass;
-    for(int c=0;c<2;c++) {
-      for(int stage=0;stage<kMaxBiquadStages;stage++) {
-        create_filter(&(biquads[stage][c]),2);
-      }
-    }
-    reset();
+    setMode(params.mode);
+    setStages(params.biquadStages);
+    Voice<SampleType>::reset();
   }
-  
-  virtual ~BiquadVoice()
+
+  bool setMode(int mode)
   {
-    for(int c=0;c<2;c++) {
-      for(int stage=0;stage<kMaxBiquadStages;stage++) {
-        destroy_filter(&(biquads[stage][c]));
-      }
+    switch(mode) {
+    case kModeBiquadBandpass:
+      this->mode = FilterTypeBandpass;
+      return true;
+    case kModeBiquadLopass:
+      this->mode = FilterTypeLopass;
+      return true;
+    case kModeBiquadHipass:
+      this->mode = FilterTypeHipass;
+      return true;
+    case kModeBiquadNotch:
+      this->mode = FilterTypeNotch;
+      return true;
     }
+    return false;
   }
-  
-  virtual void reset()
+
+  bool setStages(int stages)
   {
-    if(this->params.biquadStages >= 1 &&
-       this->params.biquadStages <= kMaxBiquadStages) {
-      stages = this->params.biquadStages;
+    if(stages >= 1 && stages <= kMaxBiquadStages) {
+      this->stages = stages;
+      return true;
     }
-        
-    for(int c=0;c<2;c++) {
-      for(int stage=0;stage<stages;stage++) {
-        // CRO XXX this was commented out dont know why 
-        //clear_filter(&(biquads[stage][c]));
-      }
+    return false;
+  }
+      
+  virtual bool transferGlobalParam(int32 index)
+  {
+    switch(index) {
+    case kGlobalParamMode:
+      return setMode(this->params.mode);
+    case kGlobalParamBiquadStages:
+      return setStages(this->params.biquadStages);
+    case kGlobalParamBiquadQ:
+      biquadQ = this->params.biquadQ;
+      return true;
+    default:
+      return Voice<SampleType>::transferGlobalParam(index);
     }
-    Voice<SampleType> :: reset(); 
   }
   
   virtual void set() {
-    switch(this->params.mode) {
-    case kModeBiquadBandpass:
-      mode = filterTypeBandpass;
-      break;
-    case kModeBiquadLopass:
-      mode = filterTypeLopass;
-      break;
-    case kModeBiquadHipass:
-      mode = filterTypeHipass;
-      break;
-    case kModeBiquadNotch:
-      mode = filterTypeNotch;
-      break;
-    }
-        
+    Voice<SampleType>::set();
     float f0 = this->getFrequency();
-    float Q = pow(2.0,12.8*this->velocity*this->params.velocitySensitivity);
-
-    //    debugf("biquad set %g %g %d\n",f0, Q, stages);
-    for(int i=0;i<stages;i++) {
-      for(int j=0;j<2;j++) {
-        biquad(f0,this->fs,Q,mode,&(biquads[i][j]));
+    float Q = exp2(std::min(12.0,std::max(0.0,8.0*biquadQ + 8.0*(this->pressure + (this->velocity-0.5)*this->params.velocitySensitivity))));
+    for(int stage=0;stage<stages;stage++) {
+      for(int c=0;c<2;c++) {
+        biquads[stage][c].create(f0,this->fs,Q,mode);
       }
     }
   }
-
-  void process(SampleType *in, SampleType *out, Filter *c, int samples)
-  {
-	for(int i=0;i<samples;i++) {
-     out[i] = filter(in[i],c);
-	}
-  }
   
-  virtual void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
+  virtual void processChunk(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
   {
-    SampleType buf1[kVoiceBufSize];
-    SampleType buf2[kVoiceBufSize];
-    SampleType bufout[2][kVoiceBufSize];
+    SampleType buf1[kVoiceChunkSize];
+    SampleType buf2[kVoiceChunkSize];
+    SampleType bufout[2][kVoiceChunkSize];
     SampleType *tmp1, *tmp2;
 
     //debugf("biquad process %d\n", sampleFrames);
     for(int c=0;c<2;c++) {
-      tmp1 = buf1;
       tmp2 = buf2;
-      memset(bufout[c],0,sampleFrames*sizeof(SampleType));
       tmp1 = in[c]+offset;
       
       for(int stage=0;stage<stages;stage++) {
-        if(tmp2 == buf1)
+        if(tmp2 == buf1) {
           tmp2 = buf2;
-        else 
-          tmp2 = buf1;	
-        process(tmp1,tmp2,&(biquads[stage][c]),sampleFrames);
+        } else {
+          tmp2 = buf1;
+        }
+        for(int i=0;i<sampleFrames;i++) {
+          tmp2[i] = biquads[stage][c].filter(tmp1[i]);
+        }
         tmp1 = tmp2;
-	  }      
+      }      
       
       for(int i=0;i<sampleFrames;i++) {
-        bufout[c][i] += tmp2[i];
+        bufout[c][i] = tmp2[i];
       }
     }
 
-    float gain = this->getGain();
+    SampleType gain = this->getGain();
     for(int i=0;i<sampleFrames;i++) {
       for(int c=0;c<2;c++) {
         out[c][offset+i] += gain * this->env * bufout[c][i];
       }
       this->tick();
     }
-    //debugf("biquad process done\n");
-
   }
- 
+
 protected:
   int stages;
   int mode;
-  Filter biquads[kMaxBiquadStages][2];
+  ParamValue biquadQ;
+  Biquad<SampleType> biquads[kMaxBiquadStages][2];
 };
 
 }

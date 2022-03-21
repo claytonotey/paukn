@@ -1,20 +1,19 @@
 #pragma once
 
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/base/futils.h"
 #include "filter.h"
 #include "params.h"
 #include "dwgs.h"
-#include <cmath>
 #include <algorithm>
 
 namespace paukn {
 
-
 enum {
-  kVoiceBufSize = 8192
+  kVoiceChunkSize = 512
 };
-
 
 class VoiceStatics
 {
@@ -40,7 +39,9 @@ public:
     params(params),
     env(0),
     neTuning(0),
-    neGain(0)
+    neGain(0),
+    pressure(0),
+    bNeedSet(true)
   {
   }
 
@@ -57,24 +58,66 @@ public:
   // note expression : [0.0 1.0]
   // global parameter : [0.0 1.0]  
 
-  float getFrequency()
+  SampleType getPitchbend()
   {
-    return VoiceStatics::freqTab[note] *
-      pow(2.0, (params.tuningRange * (neTuning + params.tuning) + .01 * tuning) / 12.0);
+    return 120.0 * neTuning + params.tuningRange * params.tuning;
+  }
+  
+  SampleType getFrequency(bool bUsePitchbend = true)
+  {
+    // note expression: =/- 10 octaves
+    // raw note expresion value [0 1] is converted to [-1 1] neTuning
+    // neTuning of +0.1 is +1 octave
+    SampleType pb = bUsePitchbend ? getPitchbend() : 0.0;
+    return VoiceStatics::freqTab[note] * exp2((pb + .01 * tuning) / 12.0);
   }
 
-  float getGain()
+  SampleType getGain()
   {
-    return pow(2.0, neGain * 2.0); 
+    // raw note expresion value [0 1] is converted to [-1 1] neGain
+    // neGain of +1.0 is +24 dB
+    return exp2(neGain * 4.0);
   }
-    
-  virtual void set()=0;
-    
-  virtual void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset)=0;
+
+  bool isSetNeeded()
+  {
+    return bNeedSet;
+  }
+  
+  void needSet()
+  {
+    bNeedSet = true;
+  }
+
+  virtual void set()
+  {
+    bNeedSet = false;
+  }
+
+  // Note this always returns true, meaning needSet is set true,
+  // All effects use pressure, so it's fine
+  virtual bool polyPressure(ParamValue pressure)
+  {
+    this->pressure = pressure;
+    return true;  
+  }
+
+
+  void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset)
+  {
+    while(sampleFrames) {
+      int nChunk = std::min((int32)kVoiceChunkSize, sampleFrames);
+      processChunk(in, out, nChunk, offset);
+      offset += nChunk;
+      sampleFrames -= nChunk;
+    }
+  }
+  
+  virtual void processChunk(SampleType **in, SampleType **out, int32 sampleFrames, int offset)=0;
 
   virtual void reset()
   {
-    eps = 1e-5;
+    pressure = 0;
     bAttackDone = false;
     bDecayDone = false;
     bSustainDone = false;
@@ -85,17 +128,17 @@ public:
   virtual void onProcessContextUpdate(ProcessContext *processContext)
   { }
   
-  virtual void setNoteExpressionValue (int32 index, ParamValue value)
+  virtual bool setNoteExpressionValue (int32 index, ParamValue value)
   {
     switch (index) {
     case Steinberg::Vst::kVolumeTypeID:    
       neGain = 2.0*(value-0.5);
-      break;
+      return true;
     case Steinberg::Vst::kTuningTypeID:
       neTuning = 2.0*(value-0.5);
-      break;
+      return true;
     default:
-      break;
+      return false;
     }
   }
   
@@ -111,7 +154,7 @@ public:
       if(!bTriggered) { bSustainDone = true; }
     } else if(!bDone) {
       env -= r;
-      if(env < eps) { env = 0.0; bDone = true; };   
+      if(env < 0) { env = 0.0; bDone = true; };   
     }
   }
 
@@ -151,6 +194,16 @@ public:
   {
     return env;
   }
+
+  virtual bool transferGlobalParam(int32 index)
+  {
+    switch(index) {
+    case kGlobalParamTuning:
+      return true;
+    default:
+      return false;
+    }
+  }
   
   int note;
   int noteID; // for mpe
@@ -160,6 +213,7 @@ public:
 protected:
   float fs;
   float velocity;
+  float pressure;
   float neGain;
   float tuning;
   float neTuning; //note expression
@@ -173,8 +227,7 @@ protected:
   bool bTriggered;
   float a,al,d,sl,r;
   float env;
-  float eps;
-
+  bool bNeedSet;
 };
 
 
@@ -186,8 +239,19 @@ public:
     Voice<SampleType>(fs,0,-1,0,0,params)
   {
   }
+
   
-  virtual void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
+  virtual bool transferGlobalParam(int32 index)
+  {
+    switch(index) {
+    case kGlobalParamThruGate:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  virtual void processChunk(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
   {
     float s = this->params.thruGate * this->env;
     for(int i=0;i<sampleFrames;i++) {

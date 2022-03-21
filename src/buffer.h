@@ -14,15 +14,11 @@ using audio = SampleType[2];
 
 using SampleCountType = long;
 
-enum {
-  initSampleBufLength = 1024
-};
-
 template<class T>
 class ArrayRingBuffer
 {
  public:
-  ArrayRingBuffer(SampleCountType N);
+  ArrayRingBuffer(SampleCountType initSize, SampleCountType lookAhead);
   virtual ~ArrayRingBuffer();
   void clear();
   void write(T *buf, SampleCountType n);
@@ -30,24 +26,24 @@ class ArrayRingBuffer
   void advanceRead(SampleCountType n);
   void advanceWrite(SampleCountType n);
   SampleCountType getLookahead();
-  void setLookahead(SampleCountType N);
+  void setLookahead(SampleCountType lookAhead);
   SampleCountType nReadable();
   T *getWriteBuf();
   T *getReadBuf();
 protected:
   void reserveWritespace(SampleCountType pos);
   SampleCountType readPos, writePos;
-  SampleCountType N;
+  SampleCountType lookAhead;
   SampleCountType length;
   T *buf;
 };
 
 
 template<class T>
-ArrayRingBuffer<T> :: ArrayRingBuffer(SampleCountType N) 
+ArrayRingBuffer<T> :: ArrayRingBuffer(SampleCountType initSize, SampleCountType lookAhead) 
 {
-  this->N = N;
-  this->length = initSampleBufLength;
+  this->lookAhead = lookAhead;
+  this->length = initSize;
   this->buf = (T*)calloc(2*length,sizeof(T));
   this->readPos = 0;
   this->writePos = 0;
@@ -102,7 +98,7 @@ void ArrayRingBuffer<T> :: advanceWrite(SampleCountType n)
 {
   reserveWritespace(n);
   writePos += n;
-  reserveWritespace(N);
+  reserveWritespace(lookAhead);
 }
 
 template<class T>
@@ -112,7 +108,7 @@ void ArrayRingBuffer<T> :: advanceRead(SampleCountType n)
   readPos += n;
   if(readPos >= length) {
     SampleCountType endPos;
-    endPos = writePos+N;
+    endPos = writePos+lookAhead;
     memmove(buf,buf+readPos,(endPos-readPos)*sizeof(T));
     memset(buf+readPos,0,((length<<1)-readPos)*sizeof(T));
     writePos -= readPos;
@@ -135,14 +131,14 @@ T *ArrayRingBuffer<T> :: getWriteBuf()
 template<class T>
 SampleCountType ArrayRingBuffer<T> :: getLookahead()
 {
-  return N;
+  return lookAhead;
 }
 
 template<class T>
-void ArrayRingBuffer<T> :: setLookahead(SampleCountType N)
+void ArrayRingBuffer<T> :: setLookahead(SampleCountType lookAhead)
 {
-   this->N = N;
-   reserveWritespace(N);
+   this->lookAhead = lookAhead;
+   reserveWritespace(lookAhead);
 }
 
 template<class T>

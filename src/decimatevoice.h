@@ -4,18 +4,20 @@
 
 namespace paukn {
   
-struct DecimateState {
-  float cursor;
-  float hold;
-};
 
 template<class SampleType>
 class DecimateVoice : public Voice<SampleType>
 {
  public:
   
+  struct DecimateState {
+    SampleType cursor;
+    SampleType hold;
+  };
+  
   DecimateVoice(float fs, int note, int noteID, float velocity, float tuning, GlobalParams &params) :
-    Voice<SampleType>(fs, note, noteID, velocity, tuning, params)
+    Voice<SampleType>(fs, note, noteID, velocity, tuning, params),
+    decBits(params.decBits)
   {
     reset();
   }
@@ -28,14 +30,25 @@ class DecimateVoice : public Voice<SampleType>
     }
     Voice<SampleType> :: reset();
   }
+  
+  virtual bool transferGlobalParam(int32 index)
+  {
+    switch(index) {
+    case kGlobalParamDecimatorBits:
+      decBits = this->params.decBits;
+      return true;
+    default:
+      return Voice<SampleType>::transferGlobalParam(index);
+    }
+  }  
 
   virtual void set()
-  { 
-    float f0 = this->getFrequency();
-    float Q = 1.0 - pow(2.0,-12.8*this->velocity*this->params.velocitySensitivity);
+  {
+    Voice<SampleType>::set();
+    SampleType f0 = this->getFrequency();
     samplesToHold = this->fs / f0;
-    float bits = 24 * Q;
-    multiplier = pow((float)2.0,(float)bits);
+    double bits = exp2(std::min(5.0,std::max(1.0,5.0*decBits+5.0*(this->pressure+(this->velocity-0.5)*this->params.velocitySensitivity))));
+    multiplier = exp2(bits);
   }
 
   void decimate(SampleType *in, SampleType *out, DecimateState *s, int sampleFrames) 
@@ -43,19 +56,19 @@ class DecimateVoice : public Voice<SampleType>
     for(int i=0;i<sampleFrames;i++) {		
       if(s->cursor > samplesToHold) {
         s->cursor -= samplesToHold;
-        s->hold = floor(multiplier*in[i]) /  multiplier;
+        s->hold = (SampleType)(lrintf(multiplier*(double)in[i]) /  multiplier);
 		}
 		s->cursor += 1.0;
 		out[i] = s->hold;
     }
   }
   
-  virtual void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
+  virtual void processChunk(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
   {
-    SampleType bufout[2][kVoiceBufSize];
+    SampleType bufout[2][kVoiceChunkSize];
     
     for(int c=0;c<2;c++) {
-      memset(bufout[c],0,sampleFrames*sizeof(float));
+      memset(bufout[c],0,sampleFrames*sizeof(SampleType));
       decimate(in[c]+offset,bufout[c],&(state[c]),sampleFrames);	      
     }
     
@@ -68,8 +81,9 @@ class DecimateVoice : public Voice<SampleType>
   }
   
 protected:
-  float multiplier;
-  float samplesToHold;
+  SampleType decBits;
+  double multiplier;
+  SampleType samplesToHold;
   DecimateState state[2];
   
 };

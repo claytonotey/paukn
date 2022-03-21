@@ -1,8 +1,6 @@
 #include "voice.h"
 #include "base/source/fstreamer.h"
 
-FILE *fpDebug;
-
 namespace paukn { 
 
 float VoiceStatics::freqTab[kNumNotes];
@@ -24,12 +22,10 @@ public:
 			VoiceStatics::freqTab[i] = (float)a;
 			a *= k;
 		}
-      fpDebug = fopen("C:\\Users\\clayt\\paukn.log","w");
    }
 
   	~VoiceStaticsOnce()
   {
-    fclose(fpDebug);
   }
 };
 

@@ -2,11 +2,12 @@
 
 #include "pluginterfaces/vst/ivstnoteexpression.h"
 
-
+/*
 #include <stdio.h>
 extern FILE *fpDebug;
-//#define debugf(args...) {fprintf(fpDebug,args); fflush(fpDebug); }
-#define debugf(args...) {}
+#define debugf(...) {fprintf(fpDebug,__VA_ARGS__); fflush(fpDebug); }
+#define debugf(...) {}
+*/
 
 namespace paukn {
 
@@ -19,22 +20,22 @@ enum {
 };
 
 enum pauknModes {
-  kModeBiquadBandpass = 0,
-  kModeBiquadNotch,
+  kModeGranulate = 0,
+  kModeDwgs,
+  kModeDecimate,
+  kModeComb,
+  kModeSync,
   kModeBiquadLopass,
   kModeBiquadHipass,
-  kModeComb,
-  kModeDecimate,
-  kModeDwgs,
-  kModeSync,
-  kModeGranulate,
-  
+  kModeBiquadBandpass,
+  kModeBiquadNotch,
+    
   kNumModes
 };
 
 enum GlobalParamTypes
 {
-  kGlobalParamMode = 0,
+  kGlobalParamMode = kCustomStart,
   kGlobalParamMix,
   kGlobalParamVolume,
   kGlobalParamTuning,
@@ -46,37 +47,33 @@ enum GlobalParamTypes
   kGlobalParamSustainLevel,
   kGlobalParamReleaseTime,
   kGlobalParamThruGate,
-  kGlobalParamThruSlewTime,  
+  kGlobalParamThruSlewTime,
+  
   kGlobalParamBiquadStages,
+  kGlobalParamBiquadQ,
 
+  kGlobalParamSyncShape,
+  kGlobalParamSyncTrigger,
+  kGlobalParamSyncEnvTime,
+
+  kGlobalParamCombFeedback,
+
+  kGlobalParamDecimatorBits,
+  
   kGlobalParamGranulatorRate,
-  kGlobalParamGranulatorOffset,
   kGlobalParamGranulatorCrossover,
   kGlobalParamGranulatorStep,
-  kGlobalParamGranulatorSize,
+  kGlobalParamGranulatorMode,
   
   kGlobalParamDwgsInpos,
   kGlobalParamDwgsLoss,
   kGlobalParamDwgsLopass,
   kGlobalParamDwgsAnharm,
-  
-  kNumGlobalParams
-};
 
-enum NoteExpressionParams
-{
-  kNoteExpressionParamVelocitySensitivity = kCustomStart,
+  kMaxGlobalParam,
+
+  kNumGlobalParams = kMaxGlobalParam - kCustomStart
   
-  kNoteExpressionParamGranulatorRate,
-  kNoteExpressionParamGranulatorCrossover,
-  kNoteExpressionParamGranulatorOffset,
-  kNoteExpressionParamGranulatorStep,
-  kNoteExpressionParamGranulatorSize,
-  
-  kNoteExpressionParamDwgsInpos,
-  kNoteExpressionParamDwgsLoss,
-  kNoteExpressionParamDwgsLopass,
-  kNoteExpressionParamDwgsAnharm
 };
 
 }

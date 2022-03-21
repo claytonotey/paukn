@@ -5,76 +5,66 @@
 
 namespace paukn {
 
-
-enum combParams {
-  kDelaySize = 8192,
-  kDelayBufSize = 8192
-};
-
 template<class SampleType>
 class CombVoice : public Voice<SampleType> {
  public:
+  enum {
+    DelaySize = 4096
+  };
+
   CombVoice(float fs, int note, int noteID, float velocity, float tuning, GlobalParams &params) :
-    Voice<SampleType>(fs, note, noteID, velocity, tuning, params)
+    Voice<SampleType>(fs, note, noteID, velocity, tuning, params),
+    combFeedback(params.combFeedback),
+    fracdelay{ Thiran<SampleType>(8), Thiran<SampleType>(8) }
+    
   {
-    float f0 = this->getFrequency();
-    for(int c=0;c<2;c++) {
-		init_delay(&(d[c]),(int)(4.0*ceil(fs/f0)));
-		create_filter(&(fracdelay[c]),8);
-    }
-    reset();
+    Voice<SampleType>::reset();
   }
 
-  virtual ~CombVoice()
+  virtual bool transferGlobalParam(int32 index)
   {
-    for(int c=0;c<2;c++) {
-		destroy_delay(&(d[c]));
-		destroy_filter(&(fracdelay[c]));
+    switch(index) {
+    case kGlobalParamCombFeedback:
+      combFeedback = this->params.combFeedback;
+      return true;
+    default:
+      return Voice<SampleType>::transferGlobalParam(index);
     }
-  }
-
-  virtual void reset()
-  {
-    for(int c=0;c<2;c++) {
-      clear_delay(&(d[c]));
-      clear_filter(&(fracdelay[c]));
-    }
-    Voice<SampleType> :: reset();
   }
   
-  void set()
-  { 
+  virtual void set()
+  {
+    Voice<SampleType>::set();
     float f0 = this->getFrequency();
-    float Q = 1.0 - pow(2.0,-12.8*this->velocity*this->params.velocitySensitivity);
+    float Q = 1.0 - exp2(-std::min(12.0,std::max(0.0,12.0*combFeedback+12.0*(this->pressure + (this->velocity-0.5)*this->params.velocitySensitivity))));
     
     float deltot = this->fs/f0;
     int del1 = deltot - 6.0;
-    if(del1<1)
+    if(del1<1) {
       del1 = 1;
+    } else if(del1 >= DelaySize) {
+      del1 = DelaySize - 1;
+    }
     float D = deltot - del1;
     for(int c=0;c<2;c++) {
-      thirian(D,(int)D,&(fracdelay[c]));
-      change_delay(&(d[c]),del1,Q);
+      fracdelay[c].create(D,(int)D);
+      d[c].setFeedback(Q);
+      d[c].setDelay(del1);
     }
   }
-  
-  void process(SampleType *in, SampleType *out, Delay *d, Filter *fracdelay, int sampleFrames) 
+    
+  void processChunk(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
   {
-    for(int i=0;i<sampleFrames;i++) {
-		SampleType o = delay_fb(in[i],d);		
-		out[i] = filter(o,fracdelay);
-    }
-  }
-  
-  void process(SampleType **in, SampleType **out, int32 sampleFrames, int offset) 
-  {
-    SampleType bufout[2][kDelayBufSize];
+    SampleType bufout[2][kVoiceChunkSize];
     
     for(int c=0;c<2;c++) {
       memset(bufout[c],0,sampleFrames*sizeof(SampleType));
-      process(in[c]+offset,bufout[c],&(d[c]),&(fracdelay[c]),sampleFrames);	      
+      for(int i=0;i<sampleFrames;i++) {
+        SampleType o = d[c].goDelay(in[c][i+offset]);		
+        bufout[c][i] = fracdelay[c].filter(o);
+      }
     }
-
+      
     float gain = this->getGain();
     for(int i=0;i<sampleFrames;i++) {
       for(int c=0;c<2;c++) {
@@ -85,9 +75,9 @@ class CombVoice : public Voice<SampleType> {
   }
 
 protected:
-  Delay d[2];
-  Filter fracdelay[2];
-
+  FeedbackDelay<SampleType, DelaySize> d[2];
+  Thiran<SampleType> fracdelay[2];
+  SampleType combFeedback;
 };
 
 

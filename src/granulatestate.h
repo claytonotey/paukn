@@ -1,63 +1,69 @@
 #pragma once
 
-#include "pluginterfaces/base/ftypes.h"
 #include "tags.h"
 
 namespace paukn {
 
-
 /*
-Once starated, the granulator fills a buffer up to size
-
-rate: [0 1] how fast to advance through the buffer
-offset: [0 1] the offset in the total buffer
+rate: [0 1] how f\ast to advance through the buffer
 crossover: [0 1] how much to ramp between grains
 step: [0 8] how much to step through the grain each tick
-size: [1/16 16] notes in size
 */
+
+enum GranulatorMode {
+  GranulatorModePitchbendLength,
+  GranulateModePitchbendStep
+};
 
 class GranulatorState
 {
 public:
-  void set(int32 index, ParamValue value)  
+
+  static ParamValue getRateFromParamValue(ParamValue value)
+  {
+    if(value == 0.5) {
+      return 0;
+    } else if(value < 0.5) {
+      int note = lrintf(-72.0*(value-1.0/6.0));
+      return -exp2(note/12.0);
+    } else {
+      int note = lrintf(-72.0*(5.0/6.0-value));
+      return exp2(note/12.0);
+    }
+  }
+
+  static ParamValue getStepFromParamValue(ParamValue value)
+  {
+    int note = lrintf(value*48);
+    return exp2((note-24)/12.0);
+  }     
+          
+  bool set(int32 index, ParamValue value)  
   {
     switch(index) {
-    case kNoteExpressionParamGranulatorRate:
     case kGlobalParamGranulatorRate:
-      if(value == 0) {
-        rate = 0;
-      } else {
-        rate = pow(2.0, 6.0*value-4.0);
-      }
-      break;
-    case kNoteExpressionParamGranulatorOffset:
-    case kGlobalParamGranulatorOffset:
-      offset = value;
-      break;
-    case kNoteExpressionParamGranulatorCrossover:
+    case kBrightnessTypeID:
+      rate = getRateFromParamValue(value);
+      return true;
     case kGlobalParamGranulatorCrossover:
-      crossover = .0031 * pow(2.0,8.0*value) - .0031;
-      break;
-    case kNoteExpressionParamGranulatorStep:
+      crossover = value;
+      return true;
     case kGlobalParamGranulatorStep:
-      if(value == 0) {
-        step = 0;
-      } else {
-        step = pow(2.0, 4.0*value-2.0);
-      }
-      break;
-    case kNoteExpressionParamGranulatorSize:
-    case kGlobalParamGranulatorSize:
-      sizeNotes = pow(2.0, lrintf((value-0.5)*8.0));
-      break;
+    case kPanTypeID:
+      step = getStepFromParamValue(value);
+      return true;
+    case kGlobalParamGranulatorMode:
+      mode = lrintf(value);
+      return true;
+    default:
+      return false;
     }
   }
   
   float rate;
-  float offset;
   float crossover;
   float step;
-  float sizeNotes;
+  int mode;
 };
 
 }

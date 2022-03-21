@@ -33,7 +33,7 @@ tresult PLUGIN_API Processor::setState (IBStream* state)
 {
   auto ret = params.setState(state);
   auto paramChanges = std::make_unique<ParameterValueVector> ();
-  for(int i=0; i<params.getNumParams(); i++) {
+  for(int i=kCustomStart; i<kMaxGlobalParam; i++) {
     paramChanges->push_back(params.getValue(i));
   }
   stateTransfer.transferObject_ui(std::move(paramChanges));
@@ -102,18 +102,16 @@ tresult PLUGIN_API Processor::process(ProcessData& data)
   stateTransfer.accessTransferObject_rt(
     [this] (const auto& paramChanges) {
       for(int i=0; i<paramChanges.size(); i++) {
-        params.setValue(i,paramChanges[i]);
+        params.setValue(kCustomStart+i,paramChanges[i]);
       }
     });
 
 
   if(data.inputs[0].silenceFlags != 0 && voiceProcessor->isSilence()) {
     data.outputs[0].silenceFlags = data.inputs[0].silenceFlags;
-  } else {
-    return voiceProcessor->process(data);
   }
+  return voiceProcessor->process(data);
 
-  return kResultTrue;
 }
 
 }

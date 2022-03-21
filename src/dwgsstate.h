@@ -1,6 +1,5 @@
 #pragma once
 
-#include "pluginterfaces/base/ftypes.h"
 #include "tags.h"
 #include <cmath>
 
@@ -21,25 +20,25 @@ using namespace Steinberg::Vst;
 
 class DwgsState {
  public:
-  void set(int32 index, ParamValue value)
+  bool set(int32 index, ParamValue value)
   {
     switch(index) {
     case kGlobalParamDwgsInpos:
-    case kNoteExpressionParamDwgsInpos:
+    case kBrightnessTypeID:
       inpos = 0.5 * value;
-      break;
+      return true;
     case kGlobalParamDwgsLoss:
-    case kNoteExpressionParamDwgsLoss:
-      c1 = 0.04*pow(2.0,8.0*value);
-      break;
+      c1 = 0.04*pow(2.0,10.0*value);
+      return true;
     case kGlobalParamDwgsLopass:
-    case kNoteExpressionParamDwgsLopass:
-      c3 = 0.1*pow(2.0,8.0*value);
-      break;
+    case kPanTypeID:
+      c3 = 0.1*pow(2.0,12.0*value);
+      return true;
     case kGlobalParamDwgsAnharm:
-    case kNoteExpressionParamDwgsAnharm:
-      B = 0.00001*pow(2.0,10.0*value);
-      break;
+      B = 0.00001*pow(2.0,8.0*value);
+      return true;
+    default:
+      return false;
     }
   }
   float inpos;

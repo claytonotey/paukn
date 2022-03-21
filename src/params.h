@@ -19,12 +19,13 @@ using SAParameter = SampleAccurate::Parameter;
 using ParameterValueVector = std::vector<ParamValue>;
 using RTTransfer = RTTransferT<ParameterValueVector>;
 
-struct GlobalParams
+class GlobalParams
 {
 public:
 
   GlobalParams();
-
+  GlobalParams(IBStream* stream);
+  
   tresult setState (IBStream* stream);
   tresult getState (IBStream* stream);
 
@@ -36,20 +37,26 @@ public:
   bool endChanges(int32 i);
   
   int32 mode;
-  float mix;
-  float volume;
-  float tuning;
-  float velocitySensitivity;
+  ParamValue mix;
+  ParamValue volume;
+  ParamValue tuning;
+  ParamValue velocitySensitivity;
   int tuningRange;
-  float attackTime;
-  float attackLevel;
-  float decayTime;
-  float sustainLevel;
-  float releaseTime;
-  float thruGate;
-  float thruSlewTime;
+  ParamValue attackTime;
+  ParamValue attackLevel;
+  ParamValue decayTime;
+  ParamValue sustainLevel;
+  ParamValue releaseTime;
+  ParamValue thruGate;
+  ParamValue thruSlewTime;
   int biquadStages;
-
+  ParamValue biquadQ;
+  ParamValue syncShape;
+  ParamValue syncEnvTime;
+  ParamValue syncTrigger;
+  ParamValue decBits;
+  ParamValue combFeedback;
+  
   GranulatorState granulatorState;
   DwgsState dwgsState;
   static LogScale<ParamValue> envTimeLogScale;
