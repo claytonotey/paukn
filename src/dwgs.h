@@ -1,7 +1,8 @@
-#ifndef DWGS_H
-#define DWGS_H
+#pragma once
 
 #include "filter.h"
+
+namespace paukn {
 
 class dwg_node {
  public:
@@ -74,4 +75,4 @@ class dwgs {
   dwg *d[4];
 };
 
-#endif
+}

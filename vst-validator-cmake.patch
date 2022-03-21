@@ -1,0 +1,21 @@
+--- _deps/vst3sdk-src/public.sdk/samples/vst-hosting/validator/CMakeLists.txt	2022-03-19 23:43:54.252736838 -0700
++++ _deps/vst3sdk-src/public.sdk/samples/vst-hosting/validator/CMakeLists.txt.new	2022-03-19 23:45:56.762738928 -0700
+@@ -136,7 +136,14 @@
+     )
+ endif(APPLE AND NOT XCODE)
+ 
+-#####################################################
+-add_custom_command(TARGET ${target} POST_BUILD
+-	COMMAND $<TARGET_FILE:${target}> "-selftest"
+-)
++if(MINGW)
++  target_link_libraries(${target} PRIVATE stdc++fs)
++  target_link_options(${target} PRIVATE -static)
++endif()
++
++if(NOT MINGW)
++  #####################################################
++  add_custom_command(TARGET ${target} POST_BUILD
++    COMMAND $<TARGET_FILE:${target}> "-selftest"
++    )
++endif()

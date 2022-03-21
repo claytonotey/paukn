@@ -1,7 +1,8 @@
-#ifndef FILTER_H
-#define FILTER_H
+#pragma once
 
-struct Filter {
+namespace paukn {
+
+struct Filter { 
   float *x, *y;
   float *xc, *yc;
   float *xend, *yend;
@@ -23,11 +24,11 @@ struct Delay {
   float fb;
 };
 
-enum biqaudtype {
-  pass = 0,
-  low,
-  high,
-  notch
+enum biquadtype {
+  filterTypeBandpass = 0,
+  filterTypeLopass,
+  filterTypeHipass,
+  filterTypeNotch
 };
 
 long choose(long n, long k);
@@ -53,5 +54,4 @@ void destroy_delay(Delay *c);
 float delay(float in, Delay *c);
 float delay_fb(float in, Delay *c);
 
-
-#endif
+}
