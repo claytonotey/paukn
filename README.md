@@ -1,22 +1,21 @@
 # PAuKn - The Pitched Audio Knife
-Control the pitch of various pitched base effects (the dwgs and granulator are neat) with MIDI and note expression (NE) in VST3.  
+Control the pitch of various pitched base effects (the dwgs and granulator are neat) with MIDI and note expression in VST3.
 
 ## Effects
 
-| Granulator | Breaks the input into grains which are cycled through |
-| Biquad filter | Includes bandpass, notch, lowpass, and hipass filter |
-| Comb | A delay based comb filter
-| Decimator | Sample and hold |
-| DWGS | Digital waveguide synthesis.  Simulating a string which is excited by the input. |
-| Sync  | Sync oscillator.  Zero crossings in the input reset the phase of a carrier oscillator. |
+- Granulator - Breaks the input into grains which are cycled through
+- Biquad filter - Includes bandpass, notch, lowpass, and hipass filter
+- Comb - A delay based comb filter
+- Decimator - Sample and hold.
+- DWGS - Digital waveguide synthesis.  Simulating a string which is excited by the input.
+- Sync - Sync oscillator.  Zero crossings in the input reset the phase of a carrier oscillator. Tracks envelope of input.
 
 ## Controlling PAuKn
-- global MIDI
 
+### Inputs
+| ID | Name | Description |
+|---|---|---|
 | MIDI 0xE0 | Pitchbend | Always changes pitch of all up to range controlled by pitchbend range param |
-
-- Note expression 
-
 | Note Expression ID | Description | Notes |
 | NE0  | Gain | Always changes gain |
 | NE1  | Pan  | Doesn't change pan, used by different effects as below |
@@ -26,45 +25,46 @@ Control the pitch of various pitched base effects (the dwgs and granulator are n
 | NE5  | Brightness or Timbre | Used by effects as below |
 
 
-- What the controls do for each effect
+### What the inputs do for each effect
 
 |             |  Granulator | Biquad filter | Comb | Decimator | DWGS | Sync |
-| MIDI note   | grain length | cutoff | delay line length | sample frequency | delay line length  | carrier osc frequency | 
+|---|---|---|---|---|---|---|
+| MIDI note   | grain length | cutoff | delay line length | sample frequency | delay line length  | carrier osc frequency |
 | Tuning NE2  |  " | " | " | " | " | " |
 | Pitchbend   | gain step | " | " | " | " | " |
 | Velocity    | - | Q | feedback | # bits | loss | carrier shape |
-| Poly Pressure | grain crossover | " | " | " | " | " | 
+| Poly Pressure | grain crossover | " | " | " | " | " |
 | Sensitivity param | - | " | " | " | " | " |
 | Gain NE0    | gain | gain | gain | gain | gain | gain |
-| Pan NE1     | grain step | - | - | - | string lopass | trigger level | 
+| Pan NE1     | grain step | - | - | - | string lopass | trigger level |
 | Timbre NE5  | grain rate | - | - | - | string inpos | - |
 
 
 ## Parameters
 Tuning and volume are global.  Additional parameters are below.
 
-- Biquad Parameters
+### Biquad Parameters
+- biquad stages - # of stages, which affects the resonance and rolloff
 
-| biquad stages | # of stages, which affects the resonance and rolloff |
+### Sync Parameters
 
-- Sync Parameters
+- shape - varies the carrier osc smoothly from atriangle wave to square-ish wave
+- trigger level - resets phase of carrier osc when this signal level is crossed
+- env time - the time constant of envelope tracker
 
-| shape | varies the carrier osc smoothly from atriangle wave to square-ish wave | trigger level | resets phase of carrier osc when this signal level is crossed |
-| env time | the time constant of envelope tracker |
+### DWGS Parameters
 
-- DWGS Parameters
+- inpos - position of input on string
+- loss  - loss at string terminal
+- lopass - lopass filter falloff at string terminal
+- anharm - string anharmonicity
 
-| inpos | position of input on string |
-| loss  | loss at string terminal |
-| lopass | lopass filter falloff at string terminal |
-| anharm | string anharmonicity |
+### Granulator Parameters
 
-- Granulator Parameters
-
-| rate           | how fast to advance the grains through the buffer |
-| crossover      | how much to smooth between grains |
-| step           | how much to step through the grain each tick |
-| size           | the total buffer length to be filled, in beats |
+- rate           - how fast to advance the grains through the buffer
+- crossover      - how much to smooth between grains
+- step           - how much to step through the grain each tick
+- size           - the total buffer length to be filled, in beats
 
 ## Plugin support
 Originally written and used in Cubase VST2.  Rewritten for VST3 SDK and tested on Ableton Live 11, where MPE doesn't work, and on Bitwig where note expression works.
@@ -75,7 +75,6 @@ Requires vst3sdk.  CMake should acquire the package from git or you can specify 
 ```
 git clone https://github.com/claytonotey/paukn.git
 cd paukn
-mkdir build
 cd build-<platform>
 . build.sh
 make -j 4
