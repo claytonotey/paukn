@@ -82,7 +82,7 @@ tresult PLUGIN_API Controller::initialize (FUnknown* context)
 		param->setPrecision (1);
 		parameters.addParameter (param);
                                                  
-		param = new RangeParameter (USTRING("Tuning Range"), kGlobalParamTuningRange, USTRING("notes"), 0, kMaxTuningRange, 2);
+		param = new RangeParameter (USTRING("Tuning Range"), kGlobalParamTuningRange, USTRING("st"), 0, kMaxTuningRange, 2);
 		param->setPrecision (0);
 		parameters.addParameter (param);
 
@@ -149,7 +149,7 @@ tresult PLUGIN_API Controller::initialize (FUnknown* context)
 		param->setPrecision (3);
 		parameters.addParameter (param);
 
-      param = new RangeParameter (USTRING("Granulator Step"), kGlobalParamGranulatorStep, USTRING("notes"), -24, 24, 0, 48);
+      param = new RangeParameter (USTRING("Granulator Step"), kGlobalParamGranulatorStep, USTRING("st"), -24, 24, 0, 48);
 		param->setPrecision (0);
 		parameters.addParameter (param);
 

@@ -7,6 +7,7 @@
 #include "biquadvoice.h"
 #include "dwgsvoice.h"
 #include "syncvoice.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include <vector>
 #include <unordered_map>
 
@@ -24,21 +25,26 @@ class Paukn : public VoiceProcessor
 {
 public:
   
-  Paukn(float fs, GlobalParams &params) :
+  Paukn(SampleType fs, int maxSamplesPerBlock, GlobalParams &params) :
     fs(fs),
     volume(1.0),
     currVolume(1.0),
     gateVoice(nullptr),
     voiceList(nullptr),
-    params(params),
-    voiceArray(VoiceStatics::kNumNotes,0)
+    params(params)
   {
+    for(int c=0; c<2; c++) {
+      inS[c] = new SampleType[maxSamplesPerBlock];
+    }
     dVol = 0.01*44100/fs;
     gateOn();
   }
   
   ~Paukn()
   {
+    for(int c=0; c<2; c++) {
+      if(inS[c]) delete inS[c];
+    }
     if(gateVoice) delete gateVoice;
     gateVoice = nullptr;
   }
@@ -62,12 +68,10 @@ public:
   
   void setAllVoices(int32 paramID)
   {
-    Voice<SampleType> *v = voiceList;
-    while(v) {
+    for(Voice<SampleType> *v = voiceList; v; v= v->next) {
       if(v->transferGlobalParam(paramID)) {
         v->needSet();
       }
-      v = v->next;
     }
   }
   
@@ -75,15 +79,14 @@ public:
   {
     auto index = noteIDMap.find(noteID);
     if(index != noteIDMap.end()) {
-      return voiceArray[index->second];
+      return index->second;
     }
     return nullptr;
   }  
 
   void addVoice(Voice<SampleType> *v)
   {
-    voiceArray[v->note] = v;
-    noteIDMap[v->noteID] = v->note;
+    noteIDMap[v->noteID] = v;
     
     v->next = voiceList;
     v->prev = nullptr;
@@ -101,7 +104,6 @@ public:
     if(n) n->prev = p;
     
     noteIDMap.erase(v->noteID);
-    voiceArray[v->note] = NULL;
   }
 
  
@@ -191,8 +193,8 @@ public:
   
   void processEvent(Event &e, ProcessData &data)
   {
+
     if(e.type == Event::kNoteOnEvent) {
-        
       if(e.noteOn.noteId == -1)
         e.noteOn.noteId = e.noteOn.pitch;
       int noteID = e.noteOn.noteId;
@@ -200,7 +202,6 @@ public:
       float velocity = e.noteOn.velocity;
       float tuning = e.noteOn.tuning;
       Voice<SampleType> *v = findVoiceWithID(noteID);
-      
       if(v) {
         v->reset();
       } else {
@@ -248,16 +249,20 @@ public:
         
         v->triggerOff(r);	
         bool bAllNotTriggered = true;
-        Voice<SampleType> *v = voiceList;
-        while(v) {
+        for(Voice<SampleType> *v = voiceList; v; v = v->next) {
           if(v->isTriggered()) { bAllNotTriggered = false; break; }
-          v = v->next;
         }
         if(bAllNotTriggered) {
           gateOn();
         }
       }
     } else if(e.type == Event::kLegacyMIDICCOutEvent) {
+      if(e.midiCCOut.controlNumber == kCtrlAllNotesOff) {
+        float envTimeGate = 1.0/(params.thruSlewTime*fs);
+        for(Voice<SampleType> *v = voiceList; v; v= v->next) {
+          v->triggerOff(envTimeGate);
+        }
+      }
     } else if(e.type == Event::kNoteExpressionValueEvent) {
       int noteID = e.noteExpressionValue.noteId;
       Voice<SampleType>* v = findVoiceWithID(noteID);
@@ -273,7 +278,6 @@ public:
       }      
       int noteID = e.polyPressure.noteId;
       Voice<SampleType> *v = findVoiceWithID(e.polyPressure.noteId);
-      //CRO XXX poly pressure ???
       if(v) {
         if(v->polyPressure(e.polyPressure.pressure)) {
           v->needSet();
@@ -284,19 +288,21 @@ public:
     }
     
   }
-  
+
   virtual tresult process(ProcessData& data)
   {
-    SampleType *inS[2];
+    // some hosts use the same buffer for input/output
     SampleType *outS[2];
     for(int i=0; i<2; i++) {
+      SampleType *in;
       if constexpr (std::is_same<SampleType,double>::value) {
-        inS[i] = (SampleType*)data.inputs[0].channelBuffers64[i];
+        in = (SampleType*)data.inputs[0].channelBuffers64[i];
         outS[i] = (SampleType*)data.outputs[0].channelBuffers64[i];
       } else {
-        inS[i] = (SampleType*)data.inputs[0].channelBuffers32[i];
+        in = (SampleType*)data.inputs[0].channelBuffers32[i];
         outS[i] = (SampleType*)data.outputs[0].channelBuffers32[i];
       }
+      memcpy(inS[i], in, data.numSamples * sizeof(SampleType));
       memset(outS[i], 0, data.numSamples * sizeof(SampleType));
     }
     
@@ -378,23 +384,22 @@ public:
    
     auto nSamples = data.numSamples - offset;
     process(inS, outS, nSamples, offset);
-
     endParameterChanges(changes);
-    
+
     return kResultTrue;
   }
    
 protected:
+  SampleType *inS[2];
   Voice<SampleType> *voiceList;
-  std::vector<Voice<SampleType>*> voiceArray;
   SampleType fs;
   GlobalParams &params;
   SampleType volume;
   SampleType currVolume;
   SampleType dVol;  
   ThruVoice<SampleType> *gateVoice;
-  std::unordered_map<int, int> noteIDMap;
- };
-
+  std::unordered_map<int, Voice<SampleType>*> noteIDMap;
+  };
+  
 } // paukn
 

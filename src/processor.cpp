@@ -50,7 +50,6 @@ tresult PLUGIN_API Processor::getState (IBStream* state)
 tresult PLUGIN_API Processor::setBusArrangements (SpeakerArrangement* inputs, int32 numIns,
                                                   SpeakerArrangement* outputs, int32 numOuts)
 {
-	// we only support one stereo output bus
 	if (numIns == 1 && numOuts == 1 &&
        inputs[0] == SpeakerArr::kStereo &&
        outputs[0] == SpeakerArr::kStereo)
@@ -72,12 +71,12 @@ tresult PLUGIN_API Processor::canProcessSampleSize (int32 symbolicSampleSize)
 
 tresult PLUGIN_API Processor::setActive (TBool state)
 {
-  if(state) {
+   if(state) {
     if(voiceProcessor == nullptr) {
       if(processSetup.symbolicSampleSize == kSample32) {
-        voiceProcessor = new Paukn<float>((float)processSetup.sampleRate, params);
+        voiceProcessor = new Paukn<float>((float)processSetup.sampleRate, processSetup.maxSamplesPerBlock, params);
       } else if (processSetup.symbolicSampleSize == kSample64) {
-        voiceProcessor = new Paukn<double>((float)processSetup.sampleRate, params);
+        voiceProcessor = new Paukn<double>((double)processSetup.sampleRate, processSetup.maxSamplesPerBlock, params);
       } else {
         return kInvalidArgument;
       }

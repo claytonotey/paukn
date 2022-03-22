@@ -32,20 +32,20 @@ public:
   }
 
 
-  SampleType fSize;
+  double fSize;
   int maxSize;
   int size;
-  SampleType start;
-  SampleType nextStart;
-  SampleType cursor;
-  SampleType crossover;
-  SampleType nextCrossover;
-  SampleType length;
-  SampleType bufPos;
+  double start;
+  double nextStart;
+  double cursor;
+  double crossover;
+  double nextCrossover;
+  double length;
+  double bufPos;
   bool bNextSet;
   bool bBackwards;
 
-  audio<SampleType> buf[kGranulatorMaxGrainBufSize];
+  SampleType buf[2][kGranulatorMaxGrainBufSize];
 };
 
 
@@ -84,7 +84,6 @@ class GranulateVoice : public Voice<SampleType>
     maxSize = (int)ceil(processContext->sampleRate * 60.0/processContext->tempo * kGranulatorMaxSizeInBeats);
     maxSize = std::min(maxSize, (int)kGranulatorMaxGrainBufSize);
     g.maxSize = maxSize;
-    //debugf("gran size %g %d\n",state.sizeNotes,maxSize);
   }
 
   virtual bool transferGlobalParam(int32 index)
@@ -112,7 +111,7 @@ class GranulateVoice : public Voice<SampleType>
     Voice<SampleType>::set();
     this->crossover = exp2(std::min(0.0,std::max(-10.0,8.0*(state.crossover - this->pressure-1.0))));
     this->f0 = this->getFrequency(false);
-    SampleType tune = exp2(this->getPitchbend() / 12.0);
+    double tune = exp2(this->getPitchbend() / 12.0);
     if(state.mode == GranulatorModePitchbendLength) {
       this->length = this->fs / (tune * f0) * 4.0;
       this->step = state.step;
@@ -138,7 +137,7 @@ class GranulateVoice : public Voice<SampleType>
     } 
   }
 
-  SampleType getStep()
+  double getStep()
   {
     return step;
   }
@@ -146,11 +145,18 @@ class GranulateVoice : public Voice<SampleType>
   void granulate(audio<SampleType> *out, int sampleFrames, int channels=2)
   {
     for(int i=0;i<sampleFrames;i++) {
-      g.fSize += 1.0 / this->step;
-      if(g.cursor >= g.fSize) g.cursor = g.start;
-
+      if(bResample) {
+        g.fSize += 1.0 / this->step;
+      } else {
+        g.fSize += 1.0;
+      }
+      
+      if(g.cursor >= g.fSize) {
+        g.cursor = g.start;
+      }
+      
       g.nextCrossover = this->crossover * length;		
-      SampleType envPoint;
+      double envPoint;
       if(!g.bBackwards) {
         envPoint = g.start+g.length;
         if(g.cursor >= g.start && g.cursor <= std::min(envPoint,g.start+length)) {
@@ -169,39 +175,55 @@ class GranulateVoice : public Voice<SampleType>
       
       int k = -1;
       int k2;
-      SampleType a;
-      if(g.cursor < g.fSize && g.cursor>=0) {
+      double a;
+      if(g.cursor < g.size && g.cursor>=0) {
         k = (int)(g.cursor);
         k2 = k + 1;
-        if(k2 >= g.fSize) k2 = k;
-        a = g.cursor - (SampleType)k;
+        if(k2 >= g.size) {
+          k2 = k;
+        }
+        a = g.cursor - (double)k;
       }
       
-      SampleType env = 1.0;
+      double env = 1.0;
       int l = -1;
       int l2;
-      SampleType b;
+      double b;
+
+      // turn around
+      if(!g.bBackwards && g.cursor < g.start && state.rate < 0) {
+        g.bBackwards = true;
+        envPoint = g.start;
+      } else if(g.bBackwards && g.cursor > g.start && state.rate > 0) {
+        g.bBackwards = false;
+        envPoint = g.start;
+      }
       
       if((!g.bBackwards && g.cursor >= envPoint) ||
          (g.bBackwards && g.cursor <= envPoint)) {
         if(!g.bNextSet) {
-          g.nextStart = std::max((SampleType)0,g.bufPos-g.length-g.crossover);;
+          if(!g.bBackwards) {
+            g.nextStart = std::max((double)0,g.bufPos-g.length-g.crossover);
+          } else {
+            g.nextStart = g.bufPos;
+          }
           g.bNextSet = true;
         }
-        SampleType cursor2 = (g.cursor - envPoint + g.nextStart);
-        if(cursor2 < g.fSize && cursor2>=0) {
+        double cursor2 = (g.cursor - envPoint + g.nextStart);
+        if(cursor2 < g.size && cursor2>=0) {
           l = (int)(cursor2);		
           l2 = l + 1;
-          if(l2 >= g.fSize) l2 = l;
-          b = cursor2 - (SampleType)l;
-          
+          if(l2 >= g.size) {
+            l2 = l;
+          }
+          b = cursor2 - (double)l;
           if(g.bBackwards) {
             env = 1.0-(envPoint-g.cursor)/g.crossover;
           } else {
             env = 1.0-(g.cursor-envPoint)/g.crossover;
           }
         }
-      }
+      } 
           
       for(int c=0; c<channels; c++) {
         if(k>=0) out[i][c] = env * ((1-a)*g.buf[c][k] + a*g.buf[c][k2]);
@@ -209,7 +231,7 @@ class GranulateVoice : public Voice<SampleType>
         if(l>=0) out[i][c] += (1-env) * ((1-b)*g.buf[c][l] + b*g.buf[c][l2]);
       }
 
-      SampleType step;
+      double step;
       if(bResample) {
         step = 1.0;
         g.bufPos += state.rate  / this->step;
@@ -237,7 +259,7 @@ class GranulateVoice : public Voice<SampleType>
 
   
 enum {
-  kResampleFrameSize = 4*kVoiceChunkSize
+  kResampleFrameSize = 4*kVoiceChunkSize+16
 };
 
   
@@ -246,10 +268,10 @@ enum {
     audio<SampleType> bufout[kVoiceChunkSize];
     SampleType *inOffset[2] = {in[0] + offset, in[1] + offset};
     inputSamples(inOffset, sampleFrames);
-    float ratio = 1.0 / this->step;
-    long nSamplesRequired = resampler.getNumInputSamplesRequired(sampleFrames, ratio);
-    audio<SampleType> granBuf[kResampleFrameSize];
     if(bResample) {
+      double ratio = 1.0 / this->step;
+      long nSamplesRequired = resampler.getNumInputSamplesRequired(sampleFrames, ratio);
+    audio<SampleType> granBuf[kResampleFrameSize];
       granulate(granBuf, nSamplesRequired);
       resampler.write(granBuf, nSamplesRequired, ratio);
       long nRead = resampler.read(bufout, sampleFrames);
@@ -257,7 +279,7 @@ enum {
     } else {
       granulate(bufout, sampleFrames);
     }
-    SampleType gain = this->getGain();
+    double gain = this->getGain();
     for(int i=0;i<sampleFrames;i++) {
       for(int c=0;c<2;c++) {
         out[c][offset+i] += gain * this->env * bufout[i][c];
@@ -268,11 +290,11 @@ enum {
   
 protected:
   bool bResample;
-  SampleType f0;
+  double f0;
   Resampler<SampleType> resampler;
-  SampleType length;
-  SampleType crossover;
-  SampleType step;
+  double length;
+  double crossover;
+  double step;
   GranulatorState state;
   int maxSize;
   grain<SampleType> g;

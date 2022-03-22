@@ -8,7 +8,7 @@ namespace paukn {
   
 template<class SampleType>
 struct ResamplerFrame {
-  SampleType stretch;
+  double stretch;
   audio<SampleType> *buf;
   SampleCountType size;
 };
@@ -40,7 +40,7 @@ protected:
   ResamplerFrame<SampleType> frame;
   SampleCountType startAbs;
   SampleCountType midAbs;
-  SampleType midAbsf;
+  double midAbsf;
   SampleCountType endAbs;
   SampleCountType writePosAbs;
   bool bInput;
@@ -52,7 +52,7 @@ protected:
   bool bPull;
 
   SampleBuf *in;
-  SampleType f;
+  double f;
   SampleCountType maxDist;
  
 };
@@ -123,14 +123,15 @@ template<class SampleType>
 SampleCountType Resampler<SampleType> :: getNumInputSamplesRequired(SampleCountType advance, float stretch)
 {
   SampleCountType maxDist;
+  double scale;
   if(stretch <= 1.0f) {
     maxDist = lrintf(resampleSincSamples);
+    scale = 1.0 / stretch;
   } else {
     maxDist = lrintf(resampleSincSamples * stretch);
+    scale = 1.0 / stretch;
   }
-
-  SampleCountType nWrite = (advance - out->nReadable()) + std::max(0L, 2*maxDist - midAbs);
-  return std::max(0L, 1 + lrintf(nWrite / stretch));
+  return std::max(0L,1+lrintf(((advance-out->nReadable()) + writePosAbs - midAbs + 2*maxDist) / stretch));
 }
 
   
@@ -157,8 +158,8 @@ SampleCountType Resampler<SampleType> :: read(audio<SampleType> *audioOut, Sampl
       }
     }
     if(frame.size) {
-      SampleType f;
-      SampleType scale;
+      double f;
+      double scale;
       SampleCountType maxDist;
       
       if(frame.stretch <= 1.0f) {
@@ -171,7 +172,7 @@ SampleCountType Resampler<SampleType> :: read(audio<SampleType> *audioOut, Sampl
         maxDist = lrintf(resampleSincSamples * frame.stretch);
       }
       SampleCountType fi = (SampleCountType)(f);
-      SampleType ff = f - fi;
+      double ff = f - fi;
       if(ff<0.0f) {
         ff += 1.0f;
         fi--;
@@ -205,9 +206,9 @@ SampleCountType Resampler<SampleType> :: read(audio<SampleType> *audioOut, Sampl
           SampleCountType nAhead = end;
           out->setLookahead(nAhead);
           audio<SampleType> *o = out->getWriteBuf() + start;
-          SampleType d = (start-mid-midAbsf)*f;
+          double d = (start-mid-midAbsf)*f;
           SampleCountType di = (SampleCountType)(d);
-          SampleType df = d-di;
+          double df = d-di;
           if(df<0.0f) {
             df += 1.0f;
             di--;
